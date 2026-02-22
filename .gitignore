@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Project-specific: database and CSV exports (contain user data)
+detections.db
+exports/
+provider_review_*.csv
+
+# Test caches
+.pytest_cache/

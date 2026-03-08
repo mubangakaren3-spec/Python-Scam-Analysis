@@ -13,6 +13,7 @@ import sys
 import threading
 import queue
 import time
+from collections import Counter
 
 DB_PATH = "detections.db"
 # Whether to enable the optional background writer (default: False to preserve current behavior)
@@ -216,13 +217,14 @@ class ProviderDashboard:
     """Analytics and export functions for service providers."""
     
     @staticmethod
-    def get_daily_summary(date_str=None, provider=None):
+    def get_daily_summary(date_str=None, provider=None, source=None):
         """
         Get summary stats for a date.
 
         Args:
             date_str: Date in format "YYYY-MM-DD" (default: today)
             provider: Filter by provider (e.g., "Airtel")
+            source: Optional source filter (e.g., "provider_api_v1")
 
         Returns:
             Dictionary with counts and stats
@@ -239,6 +241,9 @@ class ProviderDashboard:
         if provider:
             conditions.append("provider = ?")
             params.append(provider)
+        if source:
+            conditions.append("source = ?")
+            params.append(source)
         where_clause = "WHERE " + " AND ".join(conditions)
 
         # Total analyzed
@@ -252,22 +257,30 @@ class ProviderDashboard:
         )
         risk_breakdown = dict(cursor.fetchall())
 
-        # Top scam types
+        # Top scam types (aggregate each flag token; ignore empty/safe rows)
         cursor.execute(
             f"""
             SELECT flags, COUNT(*) as count FROM detections
             {where_clause}
-            GROUP BY flags ORDER BY count DESC LIMIT 5
+            AND TRIM(COALESCE(flags, '')) != ''
+            GROUP BY flags
             """,
             params,
         )
-        top_scams = [{"type": row[0], "count": row[1]} for row in cursor.fetchall()]
+        top_counter = Counter()
+        for flags_str, row_count in cursor.fetchall():
+            for flag in (flags_str or "").split(","):
+                cleaned = flag.strip()
+                if cleaned:
+                    top_counter[cleaned] += row_count
+        top_scams = [{"type": k, "count": v} for k, v in top_counter.most_common(5)]
 
         conn.close()
 
         return {
             "date": date_str,
             "provider": provider or "All",
+            "source": source or "All",
             "total_analyzed": total,
             "risk_breakdown": risk_breakdown,
             "top_scams": top_scams,
@@ -297,10 +310,16 @@ class ProviderDashboard:
         query = "SELECT id, timestamp, message_masked, score, flags, risk_level, source, provider FROM detections"
         filters = []
         
+        allowed_risk_order = ["MODERATE RISK", "HIGH RISK", "EXTREME RISK - LIKELY SCAM"]
+        selected_levels = []
         if min_risk_level:
-            risk_levels = ["MODERATE RISK", "HIGH RISK", "EXTREME RISK - LIKELY SCAM"]
-            if min_risk_level in risk_levels:
-                filters.append(f"risk_level IN ({','.join(['?']*len(risk_levels))})")
+            if min_risk_level not in allowed_risk_order:
+                raise ValueError(
+                    f"Invalid min_risk_level '{min_risk_level}'. "
+                    f"Allowed: {allowed_risk_order}"
+                )
+            selected_levels = allowed_risk_order[allowed_risk_order.index(min_risk_level):]
+            filters.append(f"risk_level IN ({','.join(['?'] * len(selected_levels))})")
         
         if provider:
             filters.append("provider = ?")
@@ -312,7 +331,7 @@ class ProviderDashboard:
         
         params = []
         if min_risk_level:
-            params.extend(["MODERATE RISK", "HIGH RISK", "EXTREME RISK - LIKELY SCAM"])
+            params.extend(selected_levels)
         if provider:
             params.append(provider)
         
@@ -335,7 +354,7 @@ class ProviderDashboard:
         Calculate detector accuracy based on feedback.
 
         Returns:
-            Accuracy stats: {true_positive, false_positive, false_negative, accuracy}
+            Accuracy stats with confusion-matrix counts and metrics.
         """
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -362,20 +381,24 @@ class ProviderDashboard:
         tp = feedback_counts.get('true_positive', 0)
         fp = feedback_counts.get('false_positive', 0)
         fn = feedback_counts.get('false_negative', 0)
+        tn = feedback_counts.get('true_negative', 0)
 
-        total = tp + fp + fn
-        accuracy = (tp / (tp + fn)) if (tp + fn) > 0 else 0
+        total = tp + fp + fn + tn
+        accuracy = ((tp + tn) / total) if total > 0 else 0
         precision = (tp / (tp + fp)) if (tp + fp) > 0 else 0
+        recall = (tp / (tp + fn)) if (tp + fn) > 0 else 0
 
         conn.close()
 
         return {
             "true_positives": tp,
+            "true_negatives": tn,
             "false_positives": fp,
             "false_negatives": fn,
             "total_labeled": total,
             "accuracy": round(accuracy * 100, 1),
             "precision": round(precision * 100, 1),
+            "recall": round(recall * 100, 1),
         }
 
 

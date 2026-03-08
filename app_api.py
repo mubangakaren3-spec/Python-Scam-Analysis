@@ -2,6 +2,7 @@ import os
 import time
 import threading
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from typing import Any
 
 import storage
@@ -10,6 +11,7 @@ from detector_core import ScamDetector, get_risk_level, get_advice
 try:
     from fastapi import Depends, FastAPI, Header, HTTPException, Request
     from fastapi.responses import JSONResponse
+    from pydantic import BaseModel, Field
     FASTAPI_AVAILABLE = True
 except ImportError:
     FastAPI = None  # type: ignore[assignment]
@@ -18,6 +20,8 @@ except ImportError:
     HTTPException = RuntimeError  # type: ignore[assignment]
     Request = None  # type: ignore[assignment]
     JSONResponse = None  # type: ignore[assignment]
+    BaseModel = object  # type: ignore[assignment]
+    Field = lambda *args, **kwargs: None  # type: ignore[assignment]
     FASTAPI_AVAILABLE = False
 
 
@@ -98,17 +102,38 @@ def create_app():
     export_limit = os.getenv("SCAM_API_EXPORT_LIMIT", "10 per hour")
     batch_max_items = int(os.getenv("SCAM_API_BATCH_MAX_ITEMS", "100"))
 
-    app = FastAPI(title="Zambian Scam Detector API", version="1.0.0")
-    detector = ScamDetector()
-    limiter = InMemoryRateLimiter()
+    # Request Models
+    class AnalyzeRequest(BaseModel):
+        message: str = Field(..., min_length=1, description="Raw message text to analyze")
+        provider: str | None = Field(None, description="Optional provider identifier")
 
-    @app.on_event("startup")
-    def _startup() -> None:
+    class AnalyzeBatchRequest(BaseModel):
+        messages: list[str] = Field(..., min_length=1, max_items=batch_max_items, description="List of messages to analyze")
+        provider: str | None = Field(None, description="Optional provider identifier")
+        source: str = Field("provider_api_v1", description="Source identifier for logging")
+
+    class FeedbackRequest(BaseModel):
+        detection_id: int = Field(..., gt=0, description="ID of the detection being rated")
+        label: str = Field(..., description="User feedback label (e.g., true_positive)")
+        source: str = Field("api_v1", description="Feedback source identifier")
+        note: str = Field("", description="Optional descriptive note")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
         if log_to_db:
             try:
                 storage.init_database()
             except Exception as e:
                 print(f"[WARN] Could not initialize database: {e}")
+        yield
+
+    app = FastAPI(
+        title="Zambian Scam Detector API",
+        version="1.0.0",
+        lifespan=lifespan
+    )
+    detector = ScamDetector()
+    limiter = InMemoryRateLimiter()
 
     async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         if x_api_key != api_key:
@@ -152,28 +177,21 @@ def create_app():
         return {"status": "healthy", "service": "Zambian Scam Detector API"}
 
     @app.post("/analyze", dependencies=[Depends(require_api_key)])
-    async def analyze_message(request: Request):
+    async def analyze_message(request: Request, body: AnalyzeRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "analyze", analyze_limit)
 
-        data: dict[str, Any] = await request.json()
-        message = data.get("message")
-        provider = data.get("provider")
-
-        if not isinstance(message, str) or not message.strip():
-            raise HTTPException(status_code=400, detail="Missing or empty 'message' field in request body")
-
-        score, flags = detector.analyze(message)
+        score, flags = detector.analyze(body.message)
         risk_level, _ = get_risk_level(score)
         advice = get_advice(score, flags)
 
         det_id = _log_detection_if_enabled(
-            message=message,
+            message=body.message,
             score=score,
             flags=flags,
             risk_level=risk_level,
             source="api_v1",
-            provider=provider,
+            provider=body.provider,
         )
 
         return {
@@ -188,24 +206,15 @@ def create_app():
         }
 
     @app.post("/analyze/batch", dependencies=[Depends(require_api_key)])
-    async def analyze_batch(request: Request):
+    async def analyze_batch(request: Request, body: AnalyzeBatchRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "batch", batch_limit)
 
-        data: dict[str, Any] = await request.json()
-        messages = data.get("messages")
-        provider = data.get("provider")
-        source = data.get("source", "provider_api_v1")
-
-        if not isinstance(messages, list) or not messages:
-            raise HTTPException(status_code=400, detail="Missing or empty 'messages' list in request body")
-        if len(messages) > batch_max_items:
-            raise HTTPException(status_code=400, detail=f"Batch too large. Max items: {batch_max_items}")
-
         results = []
-        for i, message in enumerate(messages):
-            if not isinstance(message, str) or not message.strip():
-                raise HTTPException(status_code=400, detail=f"messages[{i}] must be a non-empty string")
+        for i, message in enumerate(body.messages):
+            # Internal check for empty strings even if nested in list
+            if not message.strip():
+                raise HTTPException(status_code=400, detail=f"messages[{i}] consists only of whitespace")
 
             score, flags = detector.analyze(message)
             risk_level, _ = get_risk_level(score)
@@ -215,8 +224,8 @@ def create_app():
                 score=score,
                 flags=flags,
                 risk_level=risk_level,
-                source=source,
-                provider=provider,
+                source=body.source,
+                provider=body.provider,
             )
             results.append({
                 "index": i,
@@ -236,19 +245,11 @@ def create_app():
         }
 
     @app.post("/feedback", dependencies=[Depends(require_api_key)])
-    async def submit_feedback(request: Request):
+    async def submit_feedback(request: Request, body: FeedbackRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "feedback", feedback_limit)
 
-        data: dict[str, Any] = await request.json()
-        detection_id = data.get("detection_id")
-        source = data.get("source", "api_v1")
-        label = data.get("label")
-        note = data.get("note", "")
-
-        if not isinstance(detection_id, int) or detection_id <= 0:
-            raise HTTPException(status_code=400, detail="'detection_id' must be a positive integer")
-        if label not in VALID_FEEDBACK_LABELS:
+        if body.label not in VALID_FEEDBACK_LABELS:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid label. Allowed: {sorted(VALID_FEEDBACK_LABELS)}",
@@ -256,10 +257,10 @@ def create_app():
 
         try:
             storage.record_feedback(
-                detection_id=detection_id,
-                source=source,
-                label=label,
-                note=note,
+                detection_id=body.detection_id,
+                source=body.source,
+                label=body.label,
+                note=body.note,
             )
         except Exception as e:
             print(f"[WARN] Failed to record feedback: {e}")

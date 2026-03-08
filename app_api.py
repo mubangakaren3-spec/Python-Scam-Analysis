@@ -3,7 +3,7 @@ import time
 import threading
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 import storage
 from detector_core import ScamDetector, get_risk_level, get_advice
@@ -11,6 +11,8 @@ from detector_core import ScamDetector, get_risk_level, get_advice
 try:
     from fastapi import Depends, FastAPI, Header, HTTPException, Request
     from fastapi.responses import JSONResponse
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel, Field
     FASTAPI_AVAILABLE = True
 except ImportError:
@@ -20,18 +22,11 @@ except ImportError:
     HTTPException = RuntimeError  # type: ignore[assignment]
     Request = None  # type: ignore[assignment]
     JSONResponse = None  # type: ignore[assignment]
+    RequestValidationError = Exception  # type: ignore[assignment]
+    CORSMiddleware = None  # type: ignore[assignment]
     BaseModel = object  # type: ignore[assignment]
     Field = lambda *args, **kwargs: None  # type: ignore[assignment]
     FASTAPI_AVAILABLE = False
-
-
-VALID_FEEDBACK_LABELS = {
-    "true_positive",
-    "false_positive",
-    "false_negative",
-    "true_negative",
-    "correct",
-}
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -108,18 +103,71 @@ def create_app():
         provider: str | None = Field(None, description="Optional provider identifier")
 
     class AnalyzeBatchRequest(BaseModel):
-        messages: list[str] = Field(..., min_length=1, max_items=batch_max_items, description="List of messages to analyze")
+        messages: list[str] = Field(..., min_length=1, max_length=batch_max_items, description="List of messages to analyze")
         provider: str | None = Field(None, description="Optional provider identifier")
         source: str = Field("provider_api_v1", description="Source identifier for logging")
 
     class FeedbackRequest(BaseModel):
         detection_id: int = Field(..., gt=0, description="ID of the detection being rated")
-        label: str = Field(..., description="User feedback label (e.g., true_positive)")
+        label: Literal["true_positive", "false_positive", "false_negative", "true_negative", "correct"] = Field(..., description="User feedback label")
         source: str = Field("api_v1", description="Feedback source identifier")
         note: str = Field("", description="Optional descriptive note")
+        
+    class DashboardExportRequest(BaseModel):
+        provider: str | None = Field(None, description="Optional provider identifier")
+        min_risk_level: str = Field("MODERATE RISK", description="Minimum risk level to export")
+
+    # Response Models
+    class AnalysisResult(BaseModel):
+        score: int
+        risk_level: str
+        flags: list[str]
+        advice: str
+
+    class AnalyzeResponse(BaseModel):
+        success: bool
+        detection_id: int | None
+        analysis: AnalysisResult
+
+    class BatchResultItem(BaseModel):
+        index: int
+        detection_id: int | None
+        analysis: AnalysisResult
+
+    class AnalyzeBatchResponse(BaseModel):
+        success: bool
+        count: int
+        results: list[BatchResultItem]
+
+    class FeedbackResponse(BaseModel):
+        success: bool
+        recorded: bool
+
+    class HealthResponse(BaseModel):
+        status: str
+        service: str
+        
+    class DetectionResponse(BaseModel):
+        success: bool
+        detection: dict
+
+    class DashboardSummaryResponse(BaseModel):
+        success: bool
+        summary: dict
+
+    class DashboardAccuracyResponse(BaseModel):
+        success: bool
+        accuracy: dict
+
+    class DashboardExportResponse(BaseModel):
+        success: bool
+        export_file: str
+
+    # Initialize detector instance locally to avoid Uvicorn state context failures
+    detector = ScamDetector()
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(app_instance: FastAPI):
         if log_to_db:
             try:
                 storage.init_database()
@@ -132,7 +180,16 @@ def create_app():
         version="1.0.0",
         lifespan=lifespan
     )
-    detector = ScamDetector()
+    
+    if CORSMiddleware is not None:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     limiter = InMemoryRateLimiter()
 
     async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -140,8 +197,7 @@ def create_app():
             raise HTTPException(status_code=401, detail="Unauthorized")
 
     def _client_key(request: Request) -> str:
-        client_host = request.client.host if request.client else "unknown"
-        return f"{client_host}:{request.url.path}"
+        return request.client.host if request.client else "unknown"
 
     def _check_default_limits(request: Request) -> None:
         key = _client_key(request)
@@ -170,13 +226,20 @@ def create_app():
             status_code=exc.status_code,
             content={"success": False, "error": exc.detail},
         )
+        
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(_: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={"success": False, "error": str(exc)},
+        )
 
-    @app.get("/health")
+    @app.get("/health", response_model=HealthResponse)
     async def health_check(request: Request):
         _check_default_limits(request)
         return {"status": "healthy", "service": "Zambian Scam Detector API"}
 
-    @app.post("/analyze", dependencies=[Depends(require_api_key)])
+    @app.post("/analyze", dependencies=[Depends(require_api_key)], response_model=AnalyzeResponse)
     async def analyze_message(request: Request, body: AnalyzeRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "analyze", analyze_limit)
@@ -205,17 +268,18 @@ def create_app():
             },
         }
 
-    @app.post("/analyze/batch", dependencies=[Depends(require_api_key)])
+    @app.post("/analyze/batch", dependencies=[Depends(require_api_key)], response_model=AnalyzeBatchResponse)
     async def analyze_batch(request: Request, body: AnalyzeBatchRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "batch", batch_limit)
 
-        results = []
+        # Validate all messages upfront
         for i, message in enumerate(body.messages):
-            # Internal check for empty strings even if nested in list
             if not message.strip():
                 raise HTTPException(status_code=400, detail=f"messages[{i}] consists only of whitespace")
 
+        results = []
+        for i, message in enumerate(body.messages):
             score, flags = detector.analyze(message)
             risk_level, _ = get_risk_level(score)
             advice = get_advice(score, flags)
@@ -244,16 +308,10 @@ def create_app():
             "results": results,
         }
 
-    @app.post("/feedback", dependencies=[Depends(require_api_key)])
+    @app.post("/feedback", dependencies=[Depends(require_api_key)], response_model=FeedbackResponse)
     async def submit_feedback(request: Request, body: FeedbackRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "feedback", feedback_limit)
-
-        if body.label not in VALID_FEEDBACK_LABELS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid label. Allowed: {sorted(VALID_FEEDBACK_LABELS)}",
-            )
 
         try:
             storage.record_feedback(
@@ -268,7 +326,7 @@ def create_app():
 
         return {"success": True, "recorded": True}
 
-    @app.get("/detections/{detection_id}", dependencies=[Depends(require_api_key)])
+    @app.get("/detections/{detection_id}", dependencies=[Depends(require_api_key)], response_model=DetectionResponse)
     async def get_detection(detection_id: int, request: Request):
         _check_default_limits(request)
         record = storage.get_detection_by_id(detection_id)
@@ -276,31 +334,27 @@ def create_app():
             raise HTTPException(status_code=404, detail="Detection not found")
         return {"success": True, "detection": record}
 
-    @app.get("/dashboard/summary", dependencies=[Depends(require_api_key)])
+    @app.get("/dashboard/summary", dependencies=[Depends(require_api_key)], response_model=DashboardSummaryResponse)
     async def dashboard_summary(request: Request, date: str | None = None, provider: str | None = None):
         _check_default_limits(request)
         summary = storage.ProviderDashboard.get_daily_summary(date_str=date, provider=provider)
         return {"success": True, "summary": summary}
 
-    @app.get("/dashboard/accuracy", dependencies=[Depends(require_api_key)])
+    @app.get("/dashboard/accuracy", dependencies=[Depends(require_api_key)], response_model=DashboardAccuracyResponse)
     async def dashboard_accuracy(request: Request, provider: str | None = None):
         _check_default_limits(request)
         stats = storage.ProviderDashboard.get_feedback_accuracy(provider=provider)
         return {"success": True, "accuracy": stats}
 
-    @app.post("/dashboard/export", dependencies=[Depends(require_api_key)])
-    async def dashboard_export(request: Request):
+    @app.post("/dashboard/export", dependencies=[Depends(require_api_key)], response_model=DashboardExportResponse)
+    async def dashboard_export(request: Request, body: DashboardExportRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "export", export_limit)
 
-        data: dict[str, Any] = await request.json()
-        provider = data.get("provider")
-        min_risk_level = data.get("min_risk_level", "MODERATE RISK")
-
         try:
             output_file = storage.ProviderDashboard.export_csv_for_review(
-                min_risk_level=min_risk_level,
-                provider=provider,
+                min_risk_level=body.min_risk_level,
+                provider=body.provider,
             )
         except Exception as e:
             print(f"[WARN] Failed to export CSV: {e}")

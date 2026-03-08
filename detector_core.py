@@ -103,29 +103,30 @@ SCAM_PATTERNS = [
     (r'\bsuspended\b.*\bverify\b',                          5,  "Bank phishing detected"),
     (r'\bcompromised\b.*\bverify\b',                        5,  "Bank phishing detected"),
     (r'\bverify\b.*\bimmediately\b.*\b(lose|suspended)\b',  5,  "Bank phishing detected"),
-    (r'\bzanaco\b.*\bsuspended\b',                          5,  "Bank phishing detected"),
-    (r'\bfnb\b.*\bverify\b',                                5,  "Bank phishing detected"),
+    (r'(?=.*\bzanaco\b)(?=.*\bsuspended\b)',                          5,  "Bank phishing detected"),
+    (r'(?=.*\bfnb\b)(?=.*\b(verify|expire|update)\b)',                      5,  "Bank phishing detected"),
+    (r'(?=.*\b(account|bank)\b)(?=.*\b(suspended|expire|compromised)\b)(?=.*\b(verify|update|information)\b)', 5, "Bank phishing detected"),
 
     # Prize / lottery
     (r'\bcongratulations\b.*\b(won|win)\b.*\b(claim|click)\b', 5, "Prize scam detected"),
     (r'\blottery\b.*\b(winner|won|claim)\b',                5,  "Prize scam detected"),
-    (r'\b(won|win)\b.*\blottery\b',                         5,  "Prize scam detected"),  # catches 'won K50000 in the lottery'
+    (r'(?=.*\b(won|win)\b)(?=.*\blottery\b)\b',                         5,  "Prize scam detected"),  # catches 'won K50000 in the lottery'
     (r'\bprize\b.*\b(claim|click)\b',                       4,  "Prize scam detected"),
     (r'\bwin\b.*\bfree\b.*\b(trip|prize|cash)\b',           5,  "Prize scam detected"),  # 'win a free trip ... claim'
     (r'\bselected\b.*\bk\d+',                               4,  "Prize scam detected"),
     (r'\bfree\b.*\bcash\b',                                 3,  "Prize scam detected"),
     (r'\bfree\b.*\btrip\b.*\b(claim|click)\b',              5,  "Prize scam detected"),  # boosted weight
-    (r'\b(donate|donation)\b.*\b(help|emergency)\b',        5,  "Prize scam detected"),
+    (r'(?=.*\b(donate|donation)\b)(?=.*\b(help|emergency)\b)',        5,  "Prize scam detected"),
 
     # Job offer
     (r'\bwork from home\b.*\bearn\b.*\bweekly\b.*\bno experience\b', 5, "Job offer scam detected"),
     (r'\bjob\b.*\bpay.*training\b',                         5,  "Job offer scam detected"),
     (r'\bearn\b.*\bk\d+.*\bweekly\b.*\bno experience\b',   5,  "Job offer scam detected"),
     (r'\bno experience\b.*\bhigh pay\b',                    4,  "Job offer scam detected"),
-    (r'\bregister.*\bjob\b',                                3,  "Job offer scam detected"),
+    (r'(?=.*\bregister\b)(?=.*\bjob\b)\b',                                3,  "Job offer scam detected"),
 
     # Investment
-    (r'\binvest.*\bguaranteed\b',                           5,  "Investment scam detected"),
+    (r'(?=.*\binvest\b)(?=.*\bguaranteed\b)\b',                           5,  "Investment scam detected"),
     (r'\bbitcoin\b.*\bdouble\b',                            5,  "Investment scam detected"),
     (r'\bforex\b.*\bprofit\b',                              4,  "Investment scam detected"),
     (r'\bmake money\b.*\bfast\b',                           3,  "Investment scam detected"),
@@ -135,44 +136,46 @@ SCAM_PATTERNS = [
     (r'\bstranded\b.*\bsend\b',                             4,  "Emergency scam detected"),
     (r'\bemergency\b.*\b(money|send)\b',                    4,  "Emergency scam detected"),
     (r'\bhospital\b.*\bneed\b',                             3,  "Emergency scam detected"),
-    (r'\bhelp.*\bairtime\b',                                3,  "Emergency scam detected"),
-    (r'\bphone.*(broken|lost|stolen)',                       3,  "Emergency scam detected"),
-    (r'\bsend.*\bairtime\b',                                3,  "Emergency scam detected"),
+    (r'(?=.*\bhelp\b)(?=.*\bairtime\b)\b',                                3,  "Emergency scam detected"),
+    (r'(?=.*\bphone\b)(?=.*\b(broken|lost|stolen)\b)',                       3,  "Emergency scam detected"),
+    (r'(?=.*\bsend\b)(?=.*\bairtime\b)\b',                                3,  "Emergency scam detected"),
     (r'\bwithdraw\b.*\bk\d+\b',                             4,  "Emergency scam detected"),
-    (r'\bwithdraw\b.*\bemergency\b',                        4,  "Emergency scam detected"),
+    (r'(?=.*\bwithdraw\b)(?=.*\bemergency\b)',                        4,  "Emergency scam detected"),
+    (r'(?=.*\b(urgently|immediately|urgent)\b)(?=.*k\d+)',          5,  "Emergency payment request"),
 
     # Romance
     (r'\bhello dear\b.*\b(send|money|help)\b',              4,  "Romance scam detected"),
     (r'\bdear\b.*\b(send|money|flight|ticket)\b',           4,  "Romance scam detected"),
-    (r'\blove.*\b(send|money)\b',                           4,  "Romance scam detected"),
+    (r'(?=.*\blove\b)(?=.*\b(send|money)\b)',                           4,  "Romance scam detected"),
     (r'\bloving you\b.*\b(help|send|money)\b',              4,  "Romance scam detected"),
     (r'\bsoldier\b.*\b(money|send)\b',                      4,  "Romance scam detected"),
-    (r'\b(flight|ticket|visa)\b.*\bsend.*\bmoney\b',        4,  "Romance scam detected"),
+    (r'(?=.*\b(flight|ticket|visa)\b)(?=.*\bsend\b)(?=.*\bmoney\b)\b',        4,  "Romance scam detected"),
     (r'\binterested.*you\b.*\b(send|money)\b',              4,  "Romance scam detected"),
 
     # Delivery / customs — require scam-specific sender keywords
     (r'\bpackage\b.*\bcustoms\b.*\b(pay|fee)\b.*\b(release|claim)\b.*\b(now|urgent|immediately|link|click|transfer)\b', 5, "Delivery scam detected"),
-    (r'\b(dhl|fedex|ups)\b.*\b(pending|released|held)\b.*\b(pay|fee)\b', 5, "Delivery scam detected"),
-    (r'\bparcel\b.*\b(pay|fee)\b.*\b(release|claim|customs)\b',           4, "Delivery scam detected"),
-    (r'\bcustoms\b.*\bfee\b.*\b(pay now|send|transfer)\b',                 4, "Delivery scam detected"),
+    (r'(?=.*\b(package|parcel|customs)\b)(?=.*\b(held|pending|pay|fee)\b)(?=.*\b(release|claim|customs|custom|pay)\b)', 5, "Delivery scam detected"),
+    (r'(?=.*\b(dhl|fedex|ups)\b)(?=.*\b(pending|released|held)\b)(?=.*\b(pay|fee)\b)', 5, "Delivery scam detected"),
+    (r'(?=.*\bcasino\b)(?=.*\b(win|visit|big)\b)',                          5,  "Generic betting/casino scam"),
 
     # Payment requests (general red flags — require urgency or stranger context to reduce FPs)
-    (r'\bsend.*\bmoney\b.*\b(urgently|immediately|now)\b',  4,  "Payments request detected"),
-    (r'\btransfer.*\bk\d+\b',                               3,  "Payments request detected"),
-    (r'\bairtime\b.*\b(need|send)\b',                       3,  "Payments request detected"),
-    (r'\bpay.*\bfee\b.*\b(now|urgently|immediately|stranger)\b', 4, "Payments request detected"),  # narrowed
-    (r'\bdeposit\b.*\baccount\b',                           3,  "Payments request detected"),
+    (r'(?=.*\bsend\b)(?=.*\bmoney\b)(?=.*\b(urgently|immediately|now)\b)',  4,  "Payments request detected"),
+    (r'(?=.*\btransfer\b)(?=.*\bk\d+\b)',                               3,  "Payments request detected"),
+    (r'(?=.*\bairtime\b)(?=.*\b(need|send)\b)',                     3,  "Payments request detected"),
+    (r'(?=.*\bpay\b)(?=.*\bfee\b)(?=.*\b(now|urgently|immediately|stranger)\b)', 4, "Payments request detected"),  # narrowed
+    (r'(?=.*\bdeposit\b)(?=.*\baccount\b)',                         3,  "Payments request detected"),
 
     # Fake transaction receipts (requesting action)
-    (r'\breceived\b.*\b(zmw|k)\s*\d+.*\bdial\s*\*\d+#',     10,  "Fake receipt scam detected"),
+    (r'(?=.*\breceived\b)(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bdial\s*\*[\d*#]+\b)',     10,  "Fake receipt scam detected"),
     
     # Fake loans (requesting action via USSD)
-    (r'\b(loan|credit)\b.*\b(zmw|k)\s*\d+.*\bdial\s*\*\d+.*#', 10, "Fake loan scam detected"),
+    (r'(?=.*\b(loan|credit)\b)(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bdial\s*\*[\d*#]+\b)', 10, "Fake loan scam detected"),
 
-    # Generic red flags
-    (r'\b(zmw|k)\s*\d+\s*[.,]\s*\d+.*\bfrom\b',             3,  "Poor formatting / suspicious money notification"),
-    (r'\bdial\s*\*\d+.*#?',                                 3,  "Suspicious USSD dial request"),
+    # Generic flags / USSD format / Amount formatting
+    (r'(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bfrom\b)',           3,  "Suspicious money notification"),
+    (r'\bdial\s*\*[\d*#]+',                                         3,  "Suspicious USSD dial request"),
     (r'\btid\s*:\s*[a-z0-9.]+',                             3,  "Suspicious transaction ID format"),
+    (r'(?=.*\bselected\b)(?=.*\b(survey|offer|promo|gift|win)\b)', 5, "Suspicious phishing lead"),
 ]
 
 

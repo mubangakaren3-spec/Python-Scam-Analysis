@@ -33,6 +33,16 @@ test_dataset = [
     ("Win big with our new casino! visit us today.", "scam"),
     ("Your MTN number has been selected for our customer survey.", "scam"),
     ("Urgent medical emergency. Donate k50 to help John Banda.", "scam"),
+    ("Hi Mom, I will pay the electricity bill tomorrow at the office.", "safe"),
+    ("Your data bundle has expired. Dial *117# to buy a new one.", "safe"),
+    ("Airtel: Your K50 Top-up was successful. Balance is K52.10.", "safe"),
+    ("MTN: You have used 80% of your daily data. Dial *111# to check.", "safe"),
+    ("Please remember to pay the school fees before Friday.", "safe"),
+    ("The package is ready. Please call me when you have time.", "safe"),
+    ("Meeting at 2 PM in the board room. See you there.", "safe"),
+    ("Zanaco: You spent K200 at Shoprite. Bal: K4300.", "safe"),
+    ("Can we meet at the mall? I need to give you the documents.", "safe"),
+    ("I am stuck in traffic, will be late by 10 minutes.", "safe"),
 ]
 
 tp = tn = fp = fn = 0

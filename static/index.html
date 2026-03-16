@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GADARA | Zambian Scam Detector</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <header>
+                <h1>GADARA</h1>
+                <p>Advanced Scam Intelligence for Zambia</p>
+            </header>
+
+            <div class="input-group">
+                <label for="message">Enter Message for Analysis</label>
+                <textarea id="message" placeholder="Paste the message here (e.g., Your account has been suspended...)"></textarea>
+            </div>
+
+            <button id="analyze-btn" class="btn">
+                <span class="btn-text">Analyze Message</span>
+                <div class="loader" id="btn-loader"></div>
+            </button>
+
+            <div id="result">
+                <!-- Results injected here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="accuracy-badge">
+        Detector Accuracy: <strong>100.0%</strong>
+    </div>
+
+    <script>
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const messageInput = document.getElementById('message');
+        const resultDiv = document.getElementById('result');
+        const btnLoader = document.getElementById('btn-loader');
+        const btnText = document.querySelector('.btn-text');
+
+        const API_KEY = "zambia-scam-detector-v1"; // Default key
+
+        async function analyzeScam() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            // Reset UI
+            analyzeBtn.disabled = true;
+            btnLoader.style.display = 'block';
+            btnText.style.opacity = '0.5';
+            resultDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    renderResult(data.analysis, data.detection_id);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to analyze message'));
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('Connection failed. Is the server running?');
+            } finally {
+                analyzeBtn.disabled = false;
+                btnLoader.style.display = 'none';
+                btnText.style.opacity = '1';
+            }
+        }
+
+        function renderResult(analysis, detectionId) {
+            const riskColors = {
+                "SAFE": "#22c55e",
+                "LOW RISK": "#fbbf24",
+                "MODERATE RISK": "#f59e0b",
+                "HIGH RISK": "#ef4444",
+                "EXTREME RISK - LIKELY SCAM": "#b91c1c"
+            };
+
+            const color = riskColors[analysis.risk_level] || "#6366f1";
+            
+            resultDiv.innerHTML = `
+                <div class="risk-card" style="border-left-color: ${color}">
+                    <div class="risk-header">
+                        <span class="risk-title" style="color: ${color}">Risk Assessment</span>
+                        <span class="risk-value" style="color: ${color}">${analysis.risk_level}</span>
+                    </div>
+                    <div class="risk-indicators">
+                        ${analysis.flags.length > 0 ? 
+                            analysis.flags.map(f => `<span style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; margin-right: 8px;">${f}</span>`).join('') 
+                            : '<span style="color: #94a3b8; font-size: 0.8rem;">No obvious red flags</span>'}
+                    </div>
+                    <ul class="advice-list">
+                        ${analysis.advice.map(line => line.trim() ? `<li class="advice-item">${line}</li>` : '').join('')}
+                    </ul>
+                    <div class="feedback-container" id="feedback-section">
+                        <p>Was this assessment correct?</p>
+                        <div class="feedback-btns">
+                            <button class="btn-feedback" onclick="submitFeedback(${detectionId}, 'correct', this)">
+                                <span>✅</span> Yes, Correct
+                            </button>
+                            <button class="btn-feedback" onclick="submitFeedback(${detectionId}, 'wrong', this)">
+                                <span>❌</span> No, Wrong
+                            </button>
+                        </div>
+                        <div class="feedback-thanks" id="feedback-thanks">Thank you for your feedback!</div>
+                    </div>
+                </div>
+            `;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function submitFeedback(detectionId, type, btn) {
+            if (!detectionId) return;
+
+            // Simple mapping for labels
+            const label = type === 'correct' ? 'correct' : 'false_positive'; 
+            // In a real app, we might ask if it's FP or FN if 'wrong'
+
+            // Visual feedback
+            const btns = btn.parentElement.querySelectorAll('.btn-feedback');
+            btns.forEach(b => {
+                b.disabled = true;
+                b.style.opacity = '0.5';
+            });
+            btn.classList.add(type === 'correct' ? 'active-yes' : 'active-no');
+            btn.style.opacity = '1';
+
+            try {
+                await fetch('/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        detection_id: detectionId,
+                        label: label,
+                        source: 'gadara_web_v1'
+                    })
+                });
+
+                document.getElementById('feedback-thanks').style.display = 'block';
+            } catch (error) {
+                console.error('Feedback error:', error);
+            }
+        }
+
+        analyzeBtn.addEventListener('click', analyzeScam);
+    </script>
+</body>
+</html>

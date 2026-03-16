@@ -10,7 +10,8 @@ from detector_core import ScamDetector, get_risk_level, get_advice
 
 try:
     from fastapi import Depends, FastAPI, Header, HTTPException, Request
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+    from fastapi.staticfiles import StaticFiles
     from fastapi.exceptions import RequestValidationError
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel, Field
@@ -191,6 +192,23 @@ def create_app():
         )
 
     limiter = InMemoryRateLimiter()
+
+    # Serve static files for the web interface
+    if StaticFiles is not None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        static_dir = os.path.join(base_dir, "static")
+        if not os.path.exists(static_dir):
+            os.makedirs(static_dir)
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @app.get("/", response_class=FileResponse if FASTAPI_AVAILABLE else HTMLResponse)
+    async def get_index(request: Request):
+        _check_default_limits(request)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        index_path = os.path.join(base_dir, "static", "index.html")
+        if not os.path.exists(index_path):
+            raise HTTPException(status_code=404, detail="Web interface not found")
+        return FileResponse(index_path)
 
     async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         if x_api_key != api_key:

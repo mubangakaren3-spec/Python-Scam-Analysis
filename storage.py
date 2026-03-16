@@ -15,7 +15,11 @@ import queue
 import time
 from collections import Counter
 
-DB_PATH = "detections.db"
+# Handle DB path for serverless environments (like Vercel)
+DB_PATH = os.environ.get("SCAM_DB_PATH", "detections.db")
+if "VERCEL" in os.environ and DB_PATH == "detections.db":
+    # Vercel filesystem is read-only, use /tmp for temporary storage if no path provided
+    DB_PATH = "/tmp/detections.db"
 # Whether to enable the optional background writer (default: False to preserve current behavior)
 BACKGROUND_WRITER_ENABLED = False
 

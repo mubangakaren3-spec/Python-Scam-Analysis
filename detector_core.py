@@ -9,11 +9,11 @@ import re
 # Risk thresholds (shared by all consumers)
 # -------------------------------------------------------------------
 RISK_THRESHOLDS = {
-    "SAFE":                    (0, 0),
-    "LOW RISK":                (1, 4),
-    "MODERATE RISK":           (5, 9),
-    "HIGH RISK":               (10, 14),
-    "EXTREME RISK - LIKELY SCAM": (15, None),
+    "SAFE": (0, 0),
+    "LOW RISK": (1, 4),
+    "MODERATE RISK": (5, 9),
+    "HIGH RISK": (10, 14),
+    "EXTREME RISK": (15, None),
 }
 
 
@@ -31,7 +31,7 @@ def get_risk_level(score: int) -> tuple[str, str]:
     elif score < 15:
         return "HIGH RISK", "red"
     else:
-        return "EXTREME RISK - LIKELY SCAM", "darkred"
+        return "EXTREME RISK", "darkred"
 
 
 def get_advice(score: int, flags: list[str]) -> list[str]:

@@ -6,7 +6,7 @@ services:
     startCommand: uvicorn app_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: SCAM_API_KEY
-        value: zambia-scam-detector-v1
+        sync: false
       - key: SCAM_DB_PATH
         value: /data/detections.db
     disk:

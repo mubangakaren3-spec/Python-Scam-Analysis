@@ -9,6 +9,12 @@ import storage
 from detector_core import ScamDetector, get_risk_level, get_advice
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
     from fastapi import Depends, FastAPI, Header, HTTPException, Request
     from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
     from fastapi.staticfiles import StaticFiles

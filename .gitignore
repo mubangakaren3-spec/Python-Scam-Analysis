@@ -25,3 +25,6 @@ provider_review_*.csv
 
 # Test caches
 .pytest_cache/
+
+# Environment secrets
+.env

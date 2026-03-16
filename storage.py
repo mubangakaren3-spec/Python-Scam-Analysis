@@ -15,11 +15,15 @@ import queue
 import time
 from collections import Counter
 
-# Handle DB path for serverless environments (like Vercel)
+# Handle DB path for serverless/cloud environments
 DB_PATH = os.environ.get("SCAM_DB_PATH", "detections.db")
 if "VERCEL" in os.environ and DB_PATH == "detections.db":
-    # Vercel filesystem is read-only, use /tmp for temporary storage if no path provided
+    # Vercel filesystem is read-only, use /tmp for temporary storage
     DB_PATH = "/tmp/detections.db"
+elif "RENDER" in os.environ and not DB_PATH.startswith("/"):
+    # On Render, if a disk is not configured, we might want to default to /tmp or similar
+    # But if SCAM_DB_PATH is provided (like /data/detections.db), it will be used.
+    pass
 # Whether to enable the optional background writer (default: False to preserve current behavior)
 BACKGROUND_WRITER_ENABLED = False
 

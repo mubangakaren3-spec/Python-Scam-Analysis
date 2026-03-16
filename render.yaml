@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gadara-scam-detector
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app_api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SCAM_API_KEY
+        value: zambia-scam-detector-v1
+      - key: SCAM_DB_PATH
+        value: /data/detections.db
+    disk:
+      name: gadara-data
+      mountPath: /data
+      sizeGB: 1

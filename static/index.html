@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GADARA | Zambian Scam Detector</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
     <div class="container">
@@ -68,7 +68,8 @@
                 if (data.success) {
                     renderResult(data.analysis, data.detection_id);
                 } else {
-                    alert('Error: ' + (data.error || 'Failed to analyze message'));
+                    const errorMsg = data.error || 'Failed to analyze message';
+                    alert(`Analysis Failed: ${errorMsg}\n\nHint: Check if your SCAM_API_KEY environment variable is set correctly on the server.`);
                 }
             } catch (error) {
                 console.error('Fetch error:', error);

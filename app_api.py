@@ -129,7 +129,7 @@ def create_app():
         score: int
         risk_level: str
         flags: list[str]
-        advice: str
+        advice: list[str]
 
     class AnalyzeResponse(BaseModel):
         success: bool
@@ -207,14 +207,28 @@ def create_app():
             os.makedirs(static_dir)
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-    @app.get("/", response_class=FileResponse if FASTAPI_AVAILABLE else HTMLResponse)
+    @app.get("/", response_class=HTMLResponse)
     async def get_index(request: Request):
         _check_default_limits(request)
         base_dir = os.path.dirname(os.path.abspath(__file__))
         index_path = os.path.join(base_dir, "static", "index.html")
         if not os.path.exists(index_path):
             raise HTTPException(status_code=404, detail="Web interface not found")
-        return FileResponse(index_path)
+        
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Inject the actual API key from the environment into the frontend
+            # This ensures the Web UI always uses the correct key even if the user changes it
+            content = content.replace(
+                'const API_KEY = "zambia-scam-detector-v1";', 
+                f'const API_KEY = "{api_key}";'
+            )
+            return HTMLResponse(content)
+        except Exception as e:
+            print(f"[ERROR] Failed to serve index.html: {e}")
+            raise HTTPException(status_code=500, detail="Internal Server Error serving UI")
 
     async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         if x_api_key != api_key:

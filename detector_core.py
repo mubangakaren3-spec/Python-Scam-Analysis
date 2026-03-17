@@ -213,6 +213,10 @@ class ScamDetector:
                 score += weight
                 flags.append(label)
 
+        # Escalation Rule: 3+ suspicious flags = at least HIGH RISK (score 10)
+        if len(flags) >= 3 and score < 10:
+            score = 10
+
         return score, flags
 
     def get_risk_level(self, score: int) -> tuple[str, str]:

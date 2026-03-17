@@ -43,6 +43,7 @@ test_dataset = [
     ("Zanaco: You spent K200 at Shoprite. Bal: K4300.", "safe"),
     ("Can we meet at the mall? I need to give you the documents.", "safe"),
     ("I am stuck in traffic, will be late by 10 minutes.", "safe"),
+    ("Hi, I need help with airtime. dial *121#. TID: 12345678", "scam"),
 ]
 
 tp = tn = fp = fn = 0

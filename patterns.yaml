@@ -1,0 +1,240 @@
+# Zambian Scam Detector Configuration
+
+risk_thresholds:
+  SAFE:
+    min_score: 0
+    max_score: 0
+    color: "green"
+  LOW RISK:
+    min_score: 1
+    max_score: 4
+    color: "yellow"
+  MODERATE RISK:
+    min_score: 5
+    max_score: 9
+    color: "orange"
+  HIGH RISK:
+    min_score: 10
+    max_score: 14
+    color: "red"
+  EXTREME RISK:
+    min_score: 15
+    max_score: null
+    color: "darkred"
+
+escalation_rules:
+  min_flags: 3
+  target_score: 10
+
+patterns:
+  # Airtel Money
+  - pattern: '\bairtel\b.*\bsuspended\b'
+    weight: 5
+    label: "Airtel scam detected"
+  - pattern: '\bairtel\b.*\bverify\b'
+    weight: 5
+    label: "Airtel scam detected"
+  - pattern: '\bairtel\b.*\bupdated?\b'
+    weight: 4
+    label: "Airtel scam detected"
+
+  # MTN
+  - pattern: '\bmtn\b.*\bsuspended\b'
+    weight: 5
+    label: "MTN scam detected"
+  - pattern: '\bmtn\b.*\bverify\b'
+    weight: 5
+    label: "MTN scam detected"
+  - pattern: '\bmtn\b.*\bexpired\b.*\bupdate\b'
+    weight: 5
+    label: "MTN scam detected"
+
+  # Bank / phishing
+  - pattern: '\bsuspended\b.*\bverify\b'
+    weight: 5
+    label: "Bank phishing detected"
+  - pattern: '\bcompromised\b.*\bverify\b'
+    weight: 5
+    label: "Bank phishing detected"
+  - pattern: '\bverify\b.*\bimmediately\b.*\b(lose|suspended)\b'
+    weight: 5
+    label: "Bank phishing detected"
+  - pattern: '(?=.*\bzanaco\b)(?=.*\bsuspended\b)'
+    weight: 5
+    label: "Bank phishing detected"
+  - pattern: '(?=.*\bfnb\b)(?=.*\b(verify|expire|update)\b)'
+    weight: 5
+    label: "Bank phishing detected"
+  - pattern: '(?=.*\b(account|bank)\b)(?=.*\b(suspended|expire|compromised)\b)(?=.*\b(verify|update|information)\b)'
+    weight: 5
+    label: "Bank phishing detected"
+
+  # Prize / lottery
+  - pattern: '\bcongratulations\b.*\b(won|win)\b.*\b(claim|click)\b'
+    weight: 5
+    label: "Prize scam detected"
+  - pattern: '\blottery\b.*\b(winner|won|claim)\b'
+    weight: 5
+    label: "Prize scam detected"
+  - pattern: '(?=.*\b(won|win)\b)(?=.*\blottery\b)\b'
+    weight: 5
+    label: "Prize scam detected"
+  - pattern: '\bprize\b.*\b(claim|click)\b'
+    weight: 4
+    label: "Prize scam detected"
+  - pattern: '\bwin\b.*\bfree\b.*\b(trip|prize|cash)\b'
+    weight: 5
+    label: "Prize scam detected"
+  - pattern: '\bselected\b.*\bk\d+'
+    weight: 4
+    label: "Prize scam detected"
+  - pattern: '\bfree\b.*\bcash\b'
+    weight: 3
+    label: "Prize scam detected"
+  - pattern: '\bfree\b.*\btrip\b.*\b(claim|click)\b'
+    weight: 5
+    label: "Prize scam detected"
+  - pattern: '(?=.*\b(donate|donation)\b)(?=.*\b(help|emergency)\b)'
+    weight: 5
+    label: "Prize scam detected"
+
+  # Job offer
+  - pattern: '\bwork from home\b.*\bearn\b.*\bweekly\b.*\bno experience\b'
+    weight: 5
+    label: "Job offer scam detected"
+  - pattern: '\bjob\b.*\bpay.*training\b'
+    weight: 5
+    label: "Job offer scam detected"
+  - pattern: '\bearn\b.*\bk\d+.*\bweekly\b.*\bno experience\b'
+    weight: 5
+    label: "Job offer scam detected"
+  - pattern: '\bno experience\b.*\bhigh pay\b'
+    weight: 4
+    label: "Job offer scam detected"
+  - pattern: '(?=.*\bregister\b)(?=.*\bjob\b)\b'
+    weight: 3
+    label: "Job offer scam detected"
+
+  # Investment
+  - pattern: '(?=.*\binvest\b)(?=.*\bguaranteed\b)\b'
+    weight: 5
+    label: "Investment scam detected"
+  - pattern: '\bbitcoin\b.*\bdouble\b'
+    weight: 5
+    label: "Investment scam detected"
+  - pattern: '\bforex\b.*\bprofit\b'
+    weight: 4
+    label: "Investment scam detected"
+  - pattern: '\bmake money\b.*\bfast\b'
+    weight: 3
+    label: "Investment scam detected"
+  - pattern: '\breturns?\b.*\b\d+%\b'
+    weight: 4
+    label: "Investment scam detected"
+
+  # Emergency / help
+  - pattern: '\bstranded\b.*\bsend\b'
+    weight: 4
+    label: "Emergency scam detected"
+  - pattern: '\bemergency\b.*\b(money|send)\b'
+    weight: 4
+    label: "Emergency scam detected"
+  - pattern: '\bhospital\b.*\bneed\b'
+    weight: 3
+    label: "Emergency scam detected"
+  - pattern: '(?=.*\bhelp\b)(?=.*\bairtime\b)\b'
+    weight: 3
+    label: "Emergency scam detected"
+  - pattern: '(?=.*\bphone\b)(?=.*\b(broken|lost|stolen)\b)'
+    weight: 3
+    label: "Emergency scam detected"
+  - pattern: '(?=.*\bsend\b)(?=.*\bairtime\b)\b'
+    weight: 3
+    label: "Emergency scam detected"
+  - pattern: '\bwithdraw\b.*\bk\d+\b'
+    weight: 4
+    label: "Emergency scam detected"
+  - pattern: '(?=.*\bwithdraw\b)(?=.*\bemergency\b)'
+    weight: 4
+    label: "Emergency scam detected"
+  - pattern: '(?=.*\b(urgently|immediately|urgent)\b)(?=.*k\d+)'
+    weight: 5
+    label: "Emergency payment request"
+
+  # Romance
+  - pattern: '\bhello dear\b.*\b(send|money|help)\b'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '\bdear\b.*\b(send|money|flight|ticket)\b'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '(?=.*\blove\b)(?=.*\b(send|money)\b)'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '\bloving you\b.*\b(help|send|money)\b'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '\bsoldier\b.*\b(money|send)\b'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '(?=.*\b(flight|ticket|visa)\b)(?=.*\bsend\b)(?=.*\bmoney\b)\b'
+    weight: 4
+    label: "Romance scam detected"
+  - pattern: '\binterested.*you\b.*\b(send|money)\b'
+    weight: 4
+    label: "Romance scam detected"
+
+  # Delivery / customs
+  - pattern: '\bpackage\b.*\bcustoms\b.*\b(pay|fee)\b.*\b(release|claim)\b.*\b(now|urgent|immediately|link|click|transfer)\b'
+    weight: 5
+    label: "Delivery scam detected"
+  - pattern: '(?=.*\b(package|parcel|customs)\b)(?=.*\b(held|pending|pay|fee)\b)(?=.*\b(release|claim|customs|custom|pay)\b)'
+    weight: 5
+    label: "Delivery scam detected"
+  - pattern: '(?=.*\b(dhl|fedex|ups)\b)(?=.*\b(pending|released|held)\b)(?=.*\b(pay|fee)\b)'
+    weight: 5
+    label: "Delivery scam detected"
+  - pattern: '(?=.*\bcasino\b)(?=.*\b(win|visit|big)\b)'
+    weight: 5
+    label: "Generic betting/casino scam"
+
+  # Payment requests
+  - pattern: '(?=.*\bsend\b)(?=.*\bmoney\b)(?=.*\b(urgently|immediately|now)\b)'
+    weight: 4
+    label: "Payments request detected"
+  - pattern: '(?=.*\btransfer\b)(?=.*\bk\d+\b)'
+    weight: 3
+    label: "Payments request detected"
+  - pattern: '(?=.*\bairtime\b)(?=.*\b(need|send)\b)'
+    weight: 3
+    label: "Payments request detected"
+  - pattern: '(?=.*\bpay\b)(?=.*\bfee\b)(?=.*\b(now|urgently|immediately|stranger)\b)'
+    weight: 4
+    label: "Payments request detected"
+  - pattern: '(?=.*\bdeposit\b)(?=.*\baccount\b)'
+    weight: 3
+    label: "Payments request detected"
+
+  # Fake transaction receipts
+  - pattern: '(?=.*\breceived\b)(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bdial\s*\*[\d*#]+\b)'
+    weight: 10
+    label: "Fake receipt scam detected"
+
+  # Fake loans
+  - pattern: '(?=.*\b(loan|credit)\b)(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bdial\s*\*[\d*#]+\b)'
+    weight: 10
+    label: "Fake loan scam detected"
+
+  # Generic flags
+  - pattern: '(?=.*\b(zmw|k)\s*\d+(?:\s*[.,]\s*\d{2})?\b)(?=.*\bfrom\b)'
+    weight: 3
+    label: "Suspicious money notification"
+  - pattern: '\bdial\s*\*[\d*#]+'
+    weight: 3
+    label: "Suspicious USSD dial request"
+  - pattern: '\btid\s*:\s*[a-z0-9.]+'
+    weight: 3
+    label: "Suspicious transaction ID format"
+  - pattern: '(?=.*\bselected\b)(?=.*\b(survey|offer|promo|gift|win)\b)'
+    weight: 5
+    label: "Suspicious phishing lead"

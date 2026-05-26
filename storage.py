@@ -318,7 +318,7 @@ class ProviderDashboard:
         query = "SELECT id, timestamp, message_masked, score, flags, risk_level, source, provider FROM detections"
         filters = []
         
-        allowed_risk_order = ["MODERATE RISK", "HIGH RISK", "EXTREME RISK - LIKELY SCAM"]
+        allowed_risk_order = ["MODERATE RISK", "HIGH RISK", "EXTREME RISK"]
         selected_levels = []
         if min_risk_level:
             if min_risk_level not in allowed_risk_order:
@@ -529,7 +529,7 @@ if __name__ == "__main__":
     sub_sum.add_argument("--provider", help="Provider name")
 
     sub_export = sub.add_parser("export", help="Export detections to CSV")
-    sub_export.add_argument("--min-risk", choices=["MODERATE RISK", "HIGH RISK", "EXTREME RISK - LIKELY SCAM"], help="Minimum risk level to include")
+    sub_export.add_argument("--min-risk", choices=["MODERATE RISK", "HIGH RISK", "EXTREME RISK"], help="Minimum risk level to include")
     sub_export.add_argument("--provider", help="Filter by provider")
     sub_export.add_argument("--output", help="Output CSV file path")
 

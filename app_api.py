@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+import storage
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from typing import Any, Literal
@@ -20,6 +21,7 @@ try:
     from fastapi.staticfiles import StaticFiles
     from fastapi.exceptions import RequestValidationError
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.trustedhost import TrustedHostMiddleware
     from pydantic import BaseModel, Field
     FASTAPI_AVAILABLE = True
 except ImportError:
@@ -31,6 +33,7 @@ except ImportError:
     JSONResponse = None  # type: ignore[assignment]
     RequestValidationError = Exception  # type: ignore[assignment]
     CORSMiddleware = None  # type: ignore[assignment]
+    TrustedHostMiddleware = None  # type: ignore[assignment]
     BaseModel = object  # type: ignore[assignment]
     Field = lambda *args, **kwargs: None  # type: ignore[assignment]
     FASTAPI_AVAILABLE = False
@@ -116,7 +119,7 @@ def create_app():
 
     class FeedbackRequest(BaseModel):
         detection_id: int = Field(..., gt=0, description="ID of the detection being rated")
-        label: Literal["true_positive", "false_positive", "false_negative", "true_negative", "correct"] = Field(..., description="User feedback label")
+        label: str = Field(..., description="User feedback label")
         source: str = Field("api_v1", description="Feedback source identifier")
         note: str = Field("", description="Optional descriptive note")
         
@@ -196,6 +199,21 @@ def create_app():
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    if TrustedHostMiddleware is not None:
+        allowed_hosts = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=allowed_hosts,
+        )
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     limiter = InMemoryRateLimiter()
 
@@ -350,6 +368,11 @@ def create_app():
     async def submit_feedback(request: Request, body: FeedbackRequest):
         _check_default_limits(request)
         limiter.check(_client_key(request), "feedback", feedback_limit)
+
+        # Validate label explicitly so we can return a 400 on bad input
+        allowed_labels = {"true_positive", "false_positive", "false_negative", "true_negative", "correct"}
+        if body.label not in allowed_labels:
+            raise HTTPException(status_code=400, detail="Invalid feedback label")
 
         try:
             storage.record_feedback(
